@@ -79,7 +79,7 @@ int parseRequestHeader(Request *request, char *text){
 
 int parseProtocolVersion(Request *request, char *text){
     int i = 0;
-    while (text[i] != '\0' && text[i] != '\r' && text[i + 1] != '\n'){
+    while (text[i] != '\0' && !(text[i] == '\r' && text[i + 1] == '\n')){
         i++;
     }
 
