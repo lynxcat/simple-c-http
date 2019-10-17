@@ -15,8 +15,8 @@
 #include <stdio.h>
 #include "http.h"
 #include "request.h"
+#include "response.h"
 
-char *get_result = "HTTP/1.1 200 OK\nDate: Mon Sep 30 2019 15:02:27 GMT\nContent-Type: text/html;charset=ISO-8859-1\nContent-Length: 62\n\n<html><title>lynx http.</title><body>hello, get!</body></html>";
 char *other_result = "HTTP/1.1 200 OK\nDate: Mon Sep 30 2019 15:02:27 GMT\nContent-Type: text/html;charset=ISO-8859-1\nContent-Length: 64\n\n<html><title>lynx http.</title><body>hello, other!</body></html>";
 
 int InitHttpServer(HttpServer **server, int port, char *ipaddr){
@@ -111,13 +111,14 @@ void HandleClientRequest(int client_fd){
         printf("--path start--\n%s\n--path end--\n\n", request->path);
         printf("--version start--\n%.1f\n--version end--\n\n", request->version);
         printf("--header start--\n%s\n--header end--\n\n", request->header);
+
         if(request->method == POST || request->method == PUT){
             printf("--body start--\n%s\n--body end--\n\n", request->body);
         }
 
         //根据不同的请求进行分别处理
         if(request->method == GET){
-            send(client_fd, get_result, strlen(get_result), 0);
+            ResponseGet(request);
         }else{
             send(client_fd, other_result, strlen(other_result), 0);
         }
