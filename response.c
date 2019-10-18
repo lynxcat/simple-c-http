@@ -7,6 +7,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <sys/types.h>
 
 char *CRLF = "\r\n";
 
@@ -19,7 +22,8 @@ char *contentLength = "Content-Length: %i";
 char *server = "server: v server.";
 char *date = "Date: %s";
 
-char *error = "<html><title>lynx http.</title><body>file not find!</body></html>";
+char *err_not_find = "<html><title>error.</title><body>file not find!</body></html>";
+char *err_not_file = "<html><title>error.</title><body>path is not file!</body></html>";
 
 void ResponseGet(Request* request){
 
@@ -27,52 +31,60 @@ void ResponseGet(Request* request){
     strcat(buf, contents);
     strcat(buf, request->path);
 
-    printf("%s", buf);
+    printf("%s\n", buf);
 
     FILE *stream = fdopen(request->fd, "r+");
 
-    if(access(buf, R_OK) == 0){
+    struct stat info;
+    int ret = stat(buf, &info);
 
-        FILE *fp = fopen(buf,"rb");
+    if(ret == 0){
 
-        fseek(fp, 0L, SEEK_END);
-        long flen = ftell(fp);
+        if (info.st_mode & S_IFDIR){
+            fprintf(stream, "%s", startLine);
+            fprintf(stream, "%s", CRLF);
+            fprintf(stream, contentLength, strlen(err_not_file));
+            fprintf(stream, "%s", CRLF);
+            fprintf(stream, "%s", CRLF);
+            fprintf(stream, "%s", err_not_file);
+        }else if(S_IFREG & info.st_mode){
+            FILE *fp = fopen(buf,"rb");
 
-        char *body = (char *) malloc(flen + 1);
+            printf("length: %lld\n", info.st_size);
 
-        if(body == NULL){
-            fclose(fp);
-            fclose(stream);
+            char *body = (char *) malloc(info.st_size + 1);
+            if(body == NULL){
+                fclose(fp);
+                fclose(stream);
+            }
+
+            fread(body, info.st_size,1, fp); /* 一次性读取全部文件内容 */
+            body[info.st_size] = '\0';
+            fprintf(stream, "%s", startLine);
+            fprintf(stream, "%s", CRLF);
+            fprintf(stream, "%s", server);
+            fprintf(stream, "%s", CRLF);
+
+            time_t rawtime;
+            struct tm * timeinfo;
+            time (&rawtime);
+            timeinfo = localtime (&rawtime);
+            strftime (buf, 256, "%a, %d %b %Y %H:%M:%S GMT",timeinfo);
+
+            fprintf(stream, date, buf);
+            fprintf(stream, "%s", CRLF);
+            fprintf(stream, contentLength, strlen(body));
+            fprintf(stream, "%s", CRLF);
+            fprintf(stream, "%s", CRLF);
+            fprintf(stream, "%s", body);
         }
-        fseek(fp, 0L, SEEK_SET); /* 定位到文件开头 */
-        fread(body, flen,1, fp); /* 一次性读取全部文件内容 */
-        body[flen] = '\0';
-        fprintf(stream, "%s", startLine);
-        fprintf(stream, "%s", CRLF);
-        fprintf(stream, "%s", server);
-        fprintf(stream, "%s", CRLF);
-
-
-        time_t rawtime;
-        struct tm * timeinfo;
-        time (&rawtime);
-        timeinfo = localtime (&rawtime);
-        strftime (buf, 256, "%a, %d %b %Y %H:%M:%S GMT",timeinfo);
-
-        fprintf(stream, date, buf);
-        fprintf(stream, "%s", CRLF);
-        fprintf(stream, contentLength, strlen(body));
-        fprintf(stream, "%s", CRLF);
-        fprintf(stream, "%s", CRLF);
-        fprintf(stream, "%s", body);
-
     }else{
         fprintf(stream, "%s", startLine);
         fprintf(stream, "%s", CRLF);
-        fprintf(stream, contentLength, strlen(error));
+        fprintf(stream, contentLength, strlen(err_not_find));
         fprintf(stream, "%s", CRLF);
         fprintf(stream, "%s", CRLF);
-        fprintf(stream, "%s", error);
+        fprintf(stream, "%s", err_not_find);
     }
 
     fclose(stream);
